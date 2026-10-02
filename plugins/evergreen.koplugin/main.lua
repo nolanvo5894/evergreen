@@ -37,6 +37,7 @@ function Evergreen:init()
     if self.ui.document then
         -- reader: Evergreen's overlay replaces KOReader's top and bottom menus;
         -- closing the book brings the home back
+        self:removeStockReaderZones()
         self:registerReaderZones()
         self.dots = require("egdots"):new{ plugin = self }
         self.ui.view:registerViewModule("evergreen_dots", self.dots)
@@ -121,6 +122,38 @@ end
 ---------------------------------------------------------------------------
 -- Reader
 
+-- KOReader's own reader UI gets no touch zones: its top menu and bottom
+-- settings menu (tap, swipe and drag) and its status bar. Page turns, links,
+-- highlights and the Gestures plugin keep theirs.
+function Evergreen:removeStockReaderZones()
+    local noop = function() end
+    local function ids(prefix)
+        local zones = {}
+        for _, suffix in ipairs{ "tap", "ext_tap", "swipe", "ext_swipe", "pan", "ext_pan" } do
+            table.insert(zones, { id = prefix .. suffix })
+        end
+        return zones
+    end
+    -- the top menu registers at ReaderReady (and again on a resize)
+    self.ui.menu.onReaderReady = noop
+    self.ui.menu.initGesListener = noop
+    self.ui:unRegisterTouchZones(ids("readermenu_"))
+    -- the settings menu registered at its init, before plugins load
+    self.ui.config.initGesListener = noop
+    self.ui:unRegisterTouchZones(ids("readerconfigmenu_"))
+    -- the status bar registers at ReaderReady
+    local footer = self.ui.view and self.ui.view.footer
+    if footer then footer.setupTouchZones = noop end
+    -- gesture shortcuts for the table of contents and bookmarks open
+    -- Evergreen's Contents panel instead of KOReader's lists
+    if self.ui.toc then
+        self.ui.toc.onShowToc = function() self:openReaderPanel("contents"); return true end
+    end
+    if self.ui.bookmark then
+        self.ui.bookmark.onShowBookmark = function() self:openReaderPanel("bookmarks"); return true end
+    end
+end
+
 function Evergreen:registerReaderZones()
     local function overrides()
         return {
@@ -163,11 +196,16 @@ function Evergreen:registerReaderZones()
             end)(),
             handler = show,
         },
-        { -- bottom strip
+        { -- bottom strip (also over the bottom corner gestures)
             id = "evergreen_overlay_bottom",
             ges = "tap",
             screen_zone = { ratio_x = 0, ratio_y = 7/8, ratio_w = 1, ratio_h = 1/8 },
-            overrides = overrides(),
+            overrides = (function()
+                local o = overrides()
+                table.insert(o, "tap_left_bottom_corner")
+                table.insert(o, "tap_right_bottom_corner")
+                return o
+            end)(),
             handler = show,
         },
         { -- the swipes that used to pull the stock menus down / up
@@ -207,14 +245,24 @@ function Evergreen:applyMargins()
     end
 end
 
--- The dots replace KOReader's status bar (footer) in the reader.
+-- The dots replace KOReader's status bar (footer) in the reader. The footer
+-- is switched off for good (its touch zones are gone, see
+-- removeStockReaderZones): gestures and PDF flipping mode can't bring it back.
 function Evergreen:onReaderReady()
     self:applyMargins()
     local footer = self.ui.view and self.ui.view.footer
-    if footer and footer.mode_list and footer.mode ~= footer.mode_list.off then
-        footer:applyFooterMode(footer.mode_list.off)
+    if not (footer and footer.mode_list) then return end
+    local off = footer.mode_list.off
+    if footer.mode ~= off then
+        footer:applyFooterMode(off)
+        footer:onUpdateFooter(true) -- lets the view reclaim the footer's height
         UIManager:setDirty(self.ui.dialog, "partial")
     end
+    G_reader_settings:saveSetting("reader_footer_mode", off)
+    footer.onToggleFooterMode = function() end
+    footer.onEnterFlippingMode = function() end
+    footer.onExitFlippingMode = function() end
+    footer:disableFooter()
 end
 
 function Evergreen:onReaderTap(ges)
@@ -240,8 +288,9 @@ function Evergreen:openReaderPanel(what)
     local panel
     if what == "text" then
         panel = require("egtext"):new{ plugin = self }
-    elseif what == "contents" or what == "notes" then
-        panel = require("egcontents"):new{ plugin = self, tab = what == "notes" and "highlights" or "contents" }
+    elseif what == "contents" or what == "notes" or what == "bookmarks" then
+        local tab = ({ notes = "highlights", bookmarks = "bookmarks" })[what] or "contents"
+        panel = require("egcontents"):new{ plugin = self, tab = tab }
     elseif what == "more" then
         panel = require("egmore"):new{ plugin = self }
     end
