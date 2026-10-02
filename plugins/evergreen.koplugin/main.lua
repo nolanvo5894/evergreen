@@ -45,6 +45,12 @@ function Evergreen:init()
 
     self.ui.menu:registerToMainMenu(self)
     self.show_home_on_show = G_reader_settings:nilOrTrue("evergreen_home_on_start")
+    -- Stopping SSH must not wait for connected clients, or a restart leaves a
+    -- half-stopped server that refuses new connections.
+    if G_reader_settings:hasNot("SSH_force_kill_clients") then
+        G_reader_settings:makeTrue("SSH_force_kill_clients")
+    end
+    if self.ui.SSH then self.ui.SSH.force_kill_clients = G_reader_settings:isTrue("SSH_force_kill_clients") end
 end
 
 -- The file manager is the base layer under Evergreen's screens. It receives
