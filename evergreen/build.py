@@ -131,6 +131,12 @@ def build():
 
     stage_app(fetch_base(base), app_dir)
     patch_sftp_path(app_dir)
+    # sleep-screen wallpapers (generated with Qwen-Image 2.1, see art/)
+    walls = os.path.join(app_dir, "wallpapers")
+    os.makedirs(walls, exist_ok=True)
+    for fn in sorted(os.listdir(os.path.join(HERE, "art"))):
+        if fn.endswith(".png"):
+            shutil.copy2(os.path.join(HERE, "art", fn), os.path.join(walls, fn))
     with open(os.path.join(app_dir, "evergreen-version"), "w") as f:
         f.write(f"Evergreen {version} (KOReader {base})\n")
 

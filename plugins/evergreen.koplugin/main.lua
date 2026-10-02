@@ -45,6 +45,16 @@ function Evergreen:init()
 
     self.ui.menu:registerToMainMenu(self)
     self.show_home_on_show = G_reader_settings:nilOrTrue("evergreen_home_on_start")
+    -- Sleep screen: Evergreen's wallpapers, no "Sleeping" message (set once,
+    -- so a user's own later choice sticks)
+    if G_reader_settings:hasNot("evergreen_sleep_screen_set") then
+        local DataStorage = require("datastorage")
+        G_reader_settings:saveSetting("screensaver_type", "random_image")
+        G_reader_settings:saveSetting("screensaver_dir", DataStorage:getDataDir() .. "/wallpapers")
+        G_reader_settings:makeFalse("screensaver_show_message")
+        G_reader_settings:saveSetting("screensaver_img_background", "white")
+        G_reader_settings:makeTrue("evergreen_sleep_screen_set")
+    end
     -- Stopping SSH must not wait for connected clients, or a restart leaves a
     -- half-stopped server that refuses new connections.
     if G_reader_settings:hasNot("SSH_force_kill_clients") then
