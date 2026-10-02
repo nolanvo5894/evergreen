@@ -38,6 +38,8 @@ function Evergreen:init()
         -- reader: Evergreen's overlay replaces KOReader's top and bottom menus;
         -- closing the book brings the home back
         self:registerReaderZones()
+        self.dots = require("egdots"):new{ plugin = self }
+        self.ui.view:registerViewModule("evergreen_dots", self.dots)
         return
     end
 
@@ -112,6 +114,20 @@ function Evergreen:registerReaderZones()
     end
     local show = function(ges) return self:onReaderTap(ges) end
     self.ui:registerTouchZones({
+        { -- the chapter dot strip along the top edge: jump to a chapter
+            id = "evergreen_chapter_strip",
+            ges = "tap",
+            screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 0.03 },
+            overrides = { "evergreen_overlay_top", "readermenu_tap", "readermenu_ext_tap", "tap_forward", "tap_backward",
+                "tap_top_left_corner", "tap_top_right_corner" },
+            handler = function(ges)
+                local chapter = self.dots and self.dots:chapterAt(ges.pos.x)
+                if not chapter then return self:onReaderTap(ges) end
+                if self.ui.link then self.ui.link:addCurrentLocationToStack() end
+                self.ui:handleEvent(Event:new("GotoPage", chapter.page))
+                return true
+            end,
+        },
         { -- middle of the page
             id = "evergreen_overlay_center",
             ges = "tap",
@@ -119,11 +135,16 @@ function Evergreen:registerReaderZones()
             overrides = overrides(),
             handler = show,
         },
-        { -- top strip
+        { -- top strip (also over the top corner gestures)
             id = "evergreen_overlay_top",
             ges = "tap",
             screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1/8 },
-            overrides = overrides(),
+            overrides = (function()
+                local o = overrides()
+                table.insert(o, "tap_top_left_corner")
+                table.insert(o, "tap_top_right_corner")
+                return o
+            end)(),
             handler = show,
         },
         { -- bottom strip
@@ -147,6 +168,15 @@ function Evergreen:registerReaderZones()
             end,
         },
     })
+end
+
+-- The dots replace KOReader's status bar (footer) in the reader.
+function Evergreen:onReaderReady()
+    local footer = self.ui.view and self.ui.view.footer
+    if footer and footer.mode_list and footer.mode ~= footer.mode_list.off then
+        footer:applyFooterMode(footer.mode_list.off)
+        UIManager:setDirty(self.ui.dialog, "partial")
+    end
 end
 
 function Evergreen:onReaderTap(ges)
