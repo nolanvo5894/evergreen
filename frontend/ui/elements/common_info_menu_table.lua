@@ -21,7 +21,9 @@ common_info.more_tools = {
 }
 
 -- main tab
-if Device:hasOTAUpdates() then
+-- Evergreen: updates are delivered through KPM; the upstream OTA would replace
+-- Evergreen with stock KOReader, so it is not offered.
+if Device:hasOTAUpdates() and false then
     local OTAManager = require("ui/otamanager")
     common_info.ota_update = OTAManager:getOTAMenuTable()
 end
