@@ -170,8 +170,30 @@ function Evergreen:registerReaderZones()
     })
 end
 
+-- Evergreen's page layout: fixed "L" side and top margins (room for the
+-- position dots between the screen edge and the text).
+Evergreen.MARGIN_H = "DCREREADER_CONFIG_H_MARGIN_SIZES_XX_LARGE" -- {30, 30}
+Evergreen.MARGIN_T = "DCREREADER_CONFIG_T_MARGIN_SIZES_XX_LARGE" -- 30
+
+function Evergreen:applyMargins()
+    if not self.ui.rolling then return end
+    local conf = self.ui.document.configurable
+    local h = G_defaults:readSetting(self.MARGIN_H)
+    local t = G_defaults:readSetting(self.MARGIN_T)
+    local cur_h = conf.h_page_margins
+    if not (type(cur_h) == "table" and cur_h[1] == h[1] and cur_h[2] == h[2]) then
+        self.ui:handleEvent(Event:new("ConfigChange", "h_page_margins", h))
+        self.ui:handleEvent(Event:new("SetPageHorizMargins", h))
+    end
+    if conf.t_page_margin ~= t then
+        self.ui:handleEvent(Event:new("ConfigChange", "t_page_margin", t))
+        self.ui:handleEvent(Event:new("SetPageTopMargin", t))
+    end
+end
+
 -- The dots replace KOReader's status bar (footer) in the reader.
 function Evergreen:onReaderReady()
+    self:applyMargins()
     local footer = self.ui.view and self.ui.view.footer
     if footer and footer.mode_list and footer.mode ~= footer.mode_list.off then
         footer:applyFooterMode(footer.mode_list.off)

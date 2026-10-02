@@ -13,10 +13,10 @@ local Device = require("device")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local Screen = Device.screen
 
-local DOT = 3        -- px
-local HERE = 5       -- px, current position
-local GAP = 5        -- min px between dots
-local EDGE = 7       -- px from the screen edge to the dot centres
+local DOT = 6        -- px
+local HERE = 10      -- px, current position
+local GAP = 7        -- min px between dots
+local EDGE = 24      -- px from the screen edge when the margins are unknown
 
 local READ = Blitbuffer.COLOR_DARK_GRAY
 local AHEAD = Blitbuffer.COLOR_LIGHT_GRAY
@@ -70,10 +70,22 @@ function Dots:chapters()
     return out
 end
 
+--- The page's margins in screen px (left, top, right, bottom). The dots sit
+-- in the middle of the margins, between the screen edge and the text.
+function Dots:margins()
+    local doc = self.plugin.ui.document
+    if doc and doc.getPageMargins and self.plugin.ui.rolling then
+        local m = doc:getPageMargins()
+        if m and m.left then return m.left, m.top, m.right, m.bottom end
+    end
+    return EDGE * 2, EDGE * 2, EDGE * 2, EDGE * 2
+end
+
 function Dots:stripGeometry()
     local w = Screen:getWidth()
-    local left, right = EDGE * 3, w - EDGE * 3
-    return left, right, EDGE
+    local ml, mt, mr = self:margins()
+    -- spans the text column; vertically centred in the top margin
+    return ml, w - mr, math.max(HERE, math.floor(mt / 2))
 end
 
 --- Chapter strip layout for the current page: dots, index, chapter list.
@@ -98,12 +110,14 @@ function Dots:paintTo(bb, x, y)
 
     -- top strip: chapters
     local st = self:stripState()
+    local _, strip_y = nil, nil
     if st then
+        _, _, strip_y = self:stripGeometry()
         local span = st.right - st.left
         for i = 0, st.dots - 1 do
             local cx = st.dots > 1 and math.floor(st.left + span * i / (st.dots - 1) + 0.5) or st.left
             local color = i < st.index and READ or (i == st.index and CURRENT or AHEAD)
-            dot(bb, x + cx, y + EDGE, i == st.index and HERE or DOT, color)
+            dot(bb, x + cx, y + strip_y, i == st.index and HERE or DOT, color)
         end
     end
 
@@ -118,11 +132,13 @@ function Dots:paintTo(bb, x, y)
         total, done = ui.document:getPageCount(), page - 1
     end
     if total and total > 1 then
-        local top, bottom = EDGE * 5, h - EDGE * 5
+        -- spans the text height; horizontally centred in the right margin
+        local _, mt, mr, mb = self:margins()
+        local top, bottom = mt, h - mb
         local max_dots = math.max(1, math.floor((bottom - top + GAP) / (DOT + GAP)))
         local dots, index = bucket(done or 0, total, max_dots)
         local span = bottom - top
-        local cx = w - EDGE
+        local cx = w - math.max(HERE, math.floor(mr / 2))
         for i = 0, dots - 1 do
             local cy = dots > 1 and math.floor(top + span * i / (dots - 1) + 0.5) or top
             local color = i < index and READ or (i == index and CURRENT or AHEAD)

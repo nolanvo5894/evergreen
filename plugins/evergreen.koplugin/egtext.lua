@@ -23,11 +23,6 @@ local SPACING = {
     { _("Normal"), "DCREREADER_CONFIG_LINE_SPACE_PERCENT_MEDIUM" },
     { _("Loose"), "DCREREADER_CONFIG_LINE_SPACE_PERCENT_LARGE" },
 }
-local MARGINS = {
-    { "S", "DCREREADER_CONFIG_H_MARGIN_SIZES_SMALL" },
-    { "M", "DCREREADER_CONFIG_H_MARGIN_SIZES_MEDIUM" },
-    { "L", "DCREREADER_CONFIG_H_MARGIN_SIZES_X_LARGE" },
-}
 local DARKNESS = { { _("Light"), -0.5 }, { _("Normal"), 0 }, { _("Bold"), 1 } }
 local PREFERRED_FONTS = {
     "Bookerly", "Literata", "Noto Serif", "Noto Sans", "Amazon Ember", "Caecilia", "Georgia", "Palatino",
@@ -140,12 +135,6 @@ function TextPanel:build()
         for _, s in ipairs(SPACING) do table.insert(spacing, { s[1], D(s[2]) }) end
         choices(_("Line spacing"), spacing, self:conf("line_spacing"), function(v)
             self:apply("line_spacing", v, "SetLineSpace")
-        end)
-
-        local margins = {}
-        for _, m in ipairs(MARGINS) do table.insert(margins, { m[1], D(m[2]) }) end
-        choices(_("Margins"), margins, self:conf("h_page_margins"), function(v)
-            self:apply("h_page_margins", v, "SetPageHorizMargins")
         end)
 
         local st = self.ui.styletweak
