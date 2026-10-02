@@ -16,8 +16,7 @@ you look at most: a home screen, a cover-grid library, and Bookie sync.
   highlights synced with a self-hosted Bookie server.
 - The in-app OTA updater is hidden: updates come through KPM.
 
-Everything else is upstream KOReader. Evergreen changes are kept in their own
-plugins so upstream releases merge cleanly.
+Evergreen started from KOReader v2026.07.1 and is developed independently.
 
 ## Install (Kindle with KPM)
 
@@ -34,8 +33,7 @@ an "Evergreen" item to the Kindle library.
 
 ### Boot straight into Evergreen (optional)
 
-`boot/kshell.conf` is an upstart job that launches Evergreen (falling back to
-KOReader) once per boot, with the Amazon framework stopped. It lives on the
+`boot/kshell.conf` is an upstart job that launches Evergreen once per boot, with the Amazon framework stopped. It lives on the
 read-only root filesystem:
 
 ```
@@ -55,7 +53,7 @@ Downloads the official KOReader release named in `BASE`, lays this checkout's
 Lua (`frontend/`, `plugins/`, top-level `*.lua`) over it, and writes
 `dist/evergreen_<VERSION>_kindlehf.kpkg` plus a ready-to-host KPM repository in
 `dist/repo/`. Native code is not rebuilt, so `BASE` must match the upstream tag
-this branch is based on.
+Evergreen was forked from.
 
 ## Release
 
@@ -69,13 +67,11 @@ It builds on top of the published repository (the `gh-pages` branch, so older
 versions stay installable), pushes it, and tags the source `evergreen-v<VERSION>`.
 Kindles pick it up with `;kpm update` then `;kpm upgrade`.
 
-## Updating from upstream
+## Native engine
 
-```
-git fetch upstream --tags
-git merge v20XX.YY        # the new KOReader release tag
-echo v20XX.YY > evergreen/BASE
-```
+Evergreen is developed independently. Its native code (rendering engine and
+libraries) is taken unchanged from the KOReader release named in `BASE`; all
+Evergreen development happens in the Lua tree.
 
 ## License
 
