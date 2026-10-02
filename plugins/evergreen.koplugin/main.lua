@@ -42,8 +42,9 @@ function Evergreen:init()
             bar.left_icon_tap_callback = function() self:showHome() end
             bar.left_button.callback = bar.left_icon_tap_callback
         end
-        -- dev hook: /tmp/hs_open holding a folder path opens the library there
-        local f = io.open("/tmp/hs_open", "r")
+        -- development aid (setting evergreen_dev): /tmp/hs_open holding a
+        -- folder path opens the library there instead of the home
+        local f = G_reader_settings:isTrue("evergreen_dev") and io.open("/tmp/hs_open", "r")
         if f then
             local dir = f:read("*l")
             f:close()

@@ -373,7 +373,7 @@ function HomeWidget:tileDefs()
           function() p:toggleWifi(self) end },
         { _("SSH"), (ui.SSH and ui.SSH:isRunning()) and _("Running :2222") or _("Stopped"),
           function() p:toggleSSH(self) end },
-        { _("Settings"), _("KOReader menu"), function() self:closeThen(function() ui.menu:onShowMenu() end) end },
+        { _("Settings"), _("All settings"), function() self:closeThen(function() ui.menu:onShowMenu() end) end },
         { _("Sleep"), _("Suspend"), function() UIManager:suspend() end },
         { _("Files"), _("File browser"), function() p:openFolder(p:libraryDir()) end },
         { _("Kindle"), _("Exit to Amazon UI"), function() p:exitToKindle() end },

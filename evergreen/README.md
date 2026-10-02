@@ -57,6 +57,18 @@ Lua (`frontend/`, `plugins/`, top-level `*.lua`) over it, and writes
 `dist/repo/`. Native code is not rebuilt, so `BASE` must match the upstream tag
 this branch is based on.
 
+## Release
+
+Bump `VERSION`, commit, then:
+
+```
+evergreen/release.sh
+```
+
+It builds on top of the published repository (the `gh-pages` branch, so older
+versions stay installable), pushes it, and tags the source `evergreen-v<VERSION>`.
+Kindles pick it up with `;kpm update` then `;kpm upgrade`.
+
 ## Updating from upstream
 
 ```
