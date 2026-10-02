@@ -52,7 +52,7 @@ evergreen/build.py
 Downloads the official KOReader release named in `BASE`, lays this checkout's
 Lua (`frontend/`, `plugins/`, top-level `*.lua`) over it, and writes
 `dist/evergreen_<VERSION>_kindlehf.kpkg` plus a ready-to-host KPM repository in
-`dist/repo/`. Native code is not rebuilt, so `BASE` must match the upstream tag
+`dist/repo/`. Native code is not rebuilt, so `BASE` must stay the release
 Evergreen was forked from.
 
 ## Release
