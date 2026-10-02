@@ -709,8 +709,10 @@ function ReaderUI:extendProvider(file, provider, is_provider_forced)
 end
 
 function ReaderUI:showReaderCoroutine(file, provider, seamless)
+    -- Evergreen: name the book, not its path
+    local name = file:match("([^/]+)$"):gsub("%.[^.]+$", ""):gsub("_", " ")
     UIManager:show(InfoMessage:new{
-        text = T(_("Opening file '%1'."), BD.filepath(filemanagerutil.abbreviate(file))),
+        text = T(_("Opening %1…"), name),
         timeout = 0.0,
         invisible = seamless,
     })

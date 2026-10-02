@@ -519,15 +519,17 @@ function LibraryWidget:indexMissing()
 end
 
 function LibraryWidget:openBook(file)
-    UIManager:close(self)
-    UIManager:nextTick(function()
-        require("apps/reader/readerui"):showReader(file)
-    end)
+    self.plugin:openBook(file)
 end
 
-function LibraryWidget:goHome()
+function LibraryWidget:onShowingReader()
     UIManager:close(self)
-    UIManager:nextTick(function() self.plugin:showHome() end)
+end
+
+-- The home sits underneath; closing the library reveals it.
+function LibraryWidget:goHome()
+    if not self.plugin.home then self.plugin:showHome() end
+    UIManager:close(self)
 end
 
 function LibraryWidget:onClose()

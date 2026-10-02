@@ -36,48 +36,62 @@ function Evergreen:init()
     if self.ui.document then return end -- reader: closing the book brings the home back
 
     self.ui.menu:registerToMainMenu(self)
-    UIManager:nextTick(function()
-        local bar = self.ui.title_bar
-        if bar and bar.left_button then
-            bar.left_icon_tap_callback = function() self:showHome() end
-            bar.left_button.callback = bar.left_icon_tap_callback
+    self.show_home_on_show = G_reader_settings:nilOrTrue("evergreen_home_on_start")
+end
+
+-- The file manager is the base layer under Evergreen's screens. It receives
+-- "Show" from UIManager:show() before anything is painted, so putting the home
+-- up here (not a tick later) means the file manager is never drawn: the
+-- repaint starts at the topmost full-screen widget.
+function Evergreen:onShow()
+    if self.ui.document or self.shown_once then return end
+    self.shown_once = true
+
+    local bar = self.ui.title_bar
+    if bar and bar.left_button then
+        bar.left_icon_tap_callback = function() self:showHome() end
+        bar.left_button.callback = bar.left_icon_tap_callback
+    end
+
+    if self.show_home_on_show then
+        self:showHome()
+    end
+    -- development aid (setting evergreen_dev): /tmp/hs_open holding a
+    -- folder path also opens the library there
+    local f = G_reader_settings:isTrue("evergreen_dev") and io.open("/tmp/hs_open", "r")
+    if f then
+        local dir = f:read("*l")
+        f:close()
+        os.remove("/tmp/hs_open")
+        if dir and dir ~= "" then
+            self:showLibrary(dir, dir:match("([^/]+)$"))
         end
-        -- development aid (setting evergreen_dev): /tmp/hs_open holding a
-        -- folder path opens the library there instead of the home
-        local f = G_reader_settings:isTrue("evergreen_dev") and io.open("/tmp/hs_open", "r")
-        if f then
-            local dir = f:read("*l")
-            f:close()
-            os.remove("/tmp/hs_open")
-            if dir and dir ~= "" then
-                self:showLibrary(dir, dir:match("([^/]+)$"))
-                return
-            end
-        end
-        if G_reader_settings:nilOrTrue("evergreen_home_on_start") then
-            self:showHome()
-        end
-    end)
+    end
 end
 
 function Evergreen:showHome()
-    if self.home then
-        UIManager:close(self.home)
-        self.home = nil
-    end
+    -- show the new home before closing the old one: one repaint, no gap
+    local old = self.home
     local HomeWidget = require("homewidget")
     self.home = HomeWidget:new{ plugin = self }
     UIManager:show(self.home, "full")
+    if old then UIManager:close(old) end
 end
 
+-- The library opens on top of the home, so closing it reveals the home.
 function Evergreen:showLibrary(dir, title)
-    if self.library then
-        UIManager:close(self.library)
-        self.library = nil
-    end
+    local old = self.library
     local LibraryWidget = require("librarywidget")
     self.library = LibraryWidget:new{ plugin = self, dir = dir, title = title }
     UIManager:show(self.library, "full")
+    if old then UIManager:close(old) end
+end
+
+--- Open a book from any Evergreen screen. The screens stay up until the
+-- reader announces itself (ShowingReader), then close without a refresh.
+function Evergreen:openBook(file)
+    -- seamless: no "Opening…" box; our screen stays up until the first page
+    require("apps/reader/readerui"):showReader(file, nil, true)
 end
 
 function Evergreen:onShowHomeScreen()
@@ -109,9 +123,11 @@ function Evergreen:countBooks(dir)
 end
 
 function Evergreen:openFolder(dir)
-    if self.home then
-        UIManager:close(self.home)
-        self.home = nil
+    for _, key in ipairs({ "library", "home" }) do
+        if self[key] then
+            UIManager:close(self[key])
+            self[key] = nil
+        end
     end
     if self.ui.file_chooser then
         self.ui.file_chooser:changeToPath(dir)

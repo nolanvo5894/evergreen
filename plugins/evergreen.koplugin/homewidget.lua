@@ -331,19 +331,19 @@ function HomeWidget:tileDefs()
     local p = self.plugin
     local ui = p.ui
     local defs = {
-        { _("Library"), _("All books"), function() self:closeThen(function() p:showLibrary(p:libraryDir(), _("Library")) end) end },
-        { _("Bookie"), T(_("%1 books"), p:countBooks(p.BOOKIE_DIR)), function() self:closeThen(function() p:showLibrary(p.BOOKIE_DIR, _("Bookie")) end) end },
-        { _("History"), _("Recently read"), function() self:closeThen(function() ui.history:onShowHist() end) end },
-        { _("Favorites"), _("Collections"), function() self:closeThen(function() ui.collections:onShowColl() end) end },
+        { _("Library"), _("All books"), function() p:showLibrary(p:libraryDir(), _("Library")) end },
+        { _("Bookie"), T(_("%1 books"), p:countBooks(p.BOOKIE_DIR)), function() p:showLibrary(p.BOOKIE_DIR, _("Bookie")) end },
+        { _("History"), _("Recently read"), function() ui.history:onShowHist() end },
+        { _("Favorites"), _("Collections"), function() ui.collections:onShowColl() end },
         { _("Notes"), _("notes.txt"), function()
-            self:closeThen(function() ui.texteditor:checkEditFile(p.NOTES_FILE, false, true) end)
+            ui.texteditor:checkEditFile(p.NOTES_FILE, false, true)
         end },
-        { _("Terminal"), _("Shell"), function() self:closeThen(function() ui.terminal:onTerminalStart() end) end },
+        { _("Terminal"), _("Shell"), function() ui.terminal:onTerminalStart() end },
         { _("Wi-Fi"), NetworkMgr:isWifiOn() and _("On – tap to turn off") or _("Off – tap to turn on"),
           function() p:toggleWifi(self) end },
         { _("SSH"), (ui.SSH and ui.SSH:isRunning()) and _("Running :2222") or _("Stopped"),
           function() p:toggleSSH(self) end },
-        { _("Settings"), _("All settings"), function() self:closeThen(function() ui.menu:onShowMenu() end) end },
+        { _("Settings"), _("All settings"), function() ui.menu:onShowMenu() end },
         { _("Sleep"), _("Suspend"), function() UIManager:suspend() end },
         { _("Files"), _("File browser"), function() p:openFolder(p:libraryDir()) end },
         { _("Kindle"), _("Exit to Amazon UI"), function() p:exitToKindle() end },
@@ -402,14 +402,12 @@ end
 ---------------------------------------------------------------------------
 
 function HomeWidget:openBook(file)
-    self:closeThen(function()
-        require("apps/reader/readerui"):showReader(file)
-    end)
+    self.plugin:openBook(file)
 end
 
-function HomeWidget:closeThen(fn)
+-- The reader is taking over: get out of the way without a refresh of our own.
+function HomeWidget:onShowingReader()
     UIManager:close(self)
-    if fn then UIManager:nextTick(fn) end
 end
 
 function HomeWidget:onClose()
