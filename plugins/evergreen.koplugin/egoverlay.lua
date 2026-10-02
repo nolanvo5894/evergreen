@@ -229,7 +229,9 @@ end
 
 function Overlay:goHome()
     UIManager:close(self)
-    self.ui:onClose()
+    -- onHome closes the book and shows the file manager, which puts up
+    -- Evergreen's home (onClose alone would leave nothing on screen)
+    self.ui:onHome()
 end
 
 function Overlay:toggleBookmark()

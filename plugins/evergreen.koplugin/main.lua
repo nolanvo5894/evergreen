@@ -186,7 +186,7 @@ end
 function Evergreen:onShowHomeScreen()
     if self.ui.document then
         -- from a book: close it; the new file manager shows the home
-        self.ui:onClose()
+        self.ui:onHome()
     else
         self:showHome()
     end
