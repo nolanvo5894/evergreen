@@ -12,6 +12,7 @@ local Blitbuffer = require("ffi/blitbuffer")
 local CenterContainer = require("ui/widget/container/centercontainer")
 local Device = require("device")
 local DocSettings = require("docsettings")
+local Covers = require("egcovers")
 local Font = require("ui/font")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
@@ -47,7 +48,7 @@ local BOOK_EXT = {
     cbz = true, djvu = true, docx = true, kepub = true,
 }
 
-local COLS, ROWS = 4, 3
+local COLS, ROWS = 5, 3
 local FILTERS = { "all", "reading", "unread", "finished" }
 local FILTER_LABEL = { all = _("All"), reading = _("Reading"), unread = _("Unread"), finished = _("Finished") }
 local SORTS = { "recent", "title", "author" }
@@ -193,17 +194,17 @@ function LibraryWidget:init()
 end
 
 function LibraryWidget:computeLayout()
-    local gap_x = Screen:scaleBySize(14)
+    local gap_x = Screen:scaleBySize(12)
     self.gap_x = gap_x
     self.gap_y = Screen:scaleBySize(16)
     self.card_w = math.floor((self.inner_w - (COLS - 1) * gap_x) / COLS)
-    self.title_face = Font:getFace("tfont", 12)
-    self.meta_face = Font:getFace("cfont", 11)
+    self.title_face = Font:getFace("tfont", 11)
+    self.meta_face = Font:getFace("cfont", 10)
     self.title_h = text("Ag", self.title_face, self.card_w):getSize().h
     local meta_h = text("Ag", self.meta_face, self.card_w):getSize().h
     self.text_block_h = Screen:scaleBySize(6) + self.title_h + meta_h + Screen:scaleBySize(10)
     -- header (title + chips) and footer (pager) heights
-    self.header_h = Screen:scaleBySize(110)
+    self.header_h = Screen:scaleBySize(116)
     self.footer_h = Screen:scaleBySize(40)
     local grid_h = self.dimen.h - self.header_h - self.footer_h
     local row_h = math.floor((grid_h - (ROWS - 1) * self.gap_y) / ROWS)
@@ -391,48 +392,8 @@ function LibraryWidget:grid()
 end
 
 function LibraryWidget:coverBox(book, BIM)
-    local w, h = self.card_w, self.cover_h
-    local bw = Size.border.thin
     local info = BIM and book.indexed and BIM:getBookInfo(book.file, true)
-    local bb = info and info.cover_bb
-    local inner
-    if bb then
-        local iw, ih = bb:getWidth(), bb:getHeight()
-        inner = ImageWidget:new{
-            image = bb,
-            image_disposable = true,
-            width = w - 2 * bw,
-            height = h - 2 * bw,
-            -- fill the card, cropping the overflow (centered)
-            scale_factor = math.max((w - 2 * bw) / iw, (h - 2 * bw) / ih),
-        }
-    else
-        local pad = Screen:scaleBySize(10)
-        inner = FrameContainer:new{
-            width = w - 2 * bw,
-            height = h - 2 * bw,
-            bordersize = 0,
-            padding = pad,
-            background = LIGHT,
-            CenterContainer:new{
-                dimen = Geom:new{ w = w - 2 * bw - 2 * pad, h = h - 2 * bw - 2 * pad },
-                TextBoxWidget:new{
-                    text = book.title,
-                    face = Font:getFace("tfont", 14),
-                    width = w - 2 * bw - 2 * pad,
-                    alignment = "center",
-                    bgcolor = LIGHT,
-                },
-            },
-        }
-    end
-    return FrameContainer:new{
-        bordersize = bw,
-        padding = 0,
-        margin = 0,
-        color = GRAY,
-        inner,
-    }
+    return Covers.card({ title = book.title, cover_bb = info and info.cover_bb }, self.card_w, self.cover_h)
 end
 
 function LibraryWidget:card(book, BIM)

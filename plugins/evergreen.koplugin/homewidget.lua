@@ -103,43 +103,11 @@ local function bookInfo(file)
     }
 end
 
--- Cover image fitted in w x h, or a framed title card when there is none.
+local Covers = require("egcovers")
+
+-- Cover in a w x h slot: fitted, rounded corners; title card when missing.
 local function cover(book, w, h)
-    if book.cover_bb then
-        return CenterContainer:new{
-            dimen = Geom:new{ w = w, h = h },
-            FrameContainer:new{
-                bordersize = Size.border.thin,
-                padding = 0,
-                margin = 0,
-                ImageWidget:new{
-                    image = book.cover_bb,
-                    image_disposable = true,
-                    width = w - 2 * Size.border.thin,
-                    height = h - 2 * Size.border.thin,
-                    scale_factor = 0,
-                },
-            },
-        }
-    end
-    local pad = Screen:scaleBySize(6)
-    return FrameContainer:new{
-        width = w,
-        height = h,
-        bordersize = Size.border.thin,
-        padding = pad,
-        background = LIGHT,
-        CenterContainer:new{
-            dimen = Geom:new{ w = w - 2 * pad - 2 * Size.border.thin, h = h - 2 * pad - 2 * Size.border.thin },
-            TextBoxWidget:new{
-                text = book.title,
-                face = Font:getFace("cfont", w > Screen:scaleBySize(120) and 18 or 12),
-                width = w - 2 * pad - 2 * Size.border.thin,
-                alignment = "center",
-                bgcolor = LIGHT,
-            },
-        },
-    }
+    return Covers.card(book, w, h)
 end
 
 ---------------------------------------------------------------------------

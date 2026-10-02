@@ -98,6 +98,26 @@ def stage_app(zip_path, app_dir):
         shutil.copy2(os.path.join(ROOT, fn), os.path.join(app_dir, fn))
 
 
+def patch_sftp_path(app_dir):
+    """Point dropbear at Evergreen's sftp server.
+
+    KOReader's Kindle dropbear has "/mnt/us/koreader/sftp-server" compiled in,
+    which breaks scp/sftp when only Evergreen is installed. Rewrite it in place
+    to a path of no greater length (NUL-padded) and ship the server there too.
+    """
+    old = b"/mnt/us/koreader/sftp-server"
+    new = b"/mnt/us/evergreen/sftpd"
+    path = os.path.join(app_dir, "dropbear")
+    with open(path, "rb") as f:
+        data = f.read()
+    if data.count(old) != 1:
+        raise SystemExit(f"dropbear: expected one {old!r}, found {data.count(old)}")
+    data = data.replace(old, new + b"\0" * (len(old) - len(new)))
+    with open(path, "wb") as f:
+        f.write(data)
+    shutil.copy2(os.path.join(app_dir, "sftp-server"), os.path.join(app_dir, "sftpd"))
+
+
 def build():
     version = read("VERSION")
     base = read("BASE")
@@ -110,6 +130,7 @@ def build():
     os.makedirs(app_dir)
 
     stage_app(fetch_base(base), app_dir)
+    patch_sftp_path(app_dir)
     with open(os.path.join(app_dir, "evergreen-version"), "w") as f:
         f.write(f"Evergreen {version} (KOReader {base})\n")
 
