@@ -185,7 +185,9 @@ function HomeWidget:build()
     -- most recent first; one entry per title (the same book can exist twice)
     local books, seen = {}, {}
     for _, entry in ipairs(ReadHistory.hist) do
-        if not entry.dim and lfs.attributes(entry.file, "mode") == "file" then
+        -- skip missing files and the bundled help (quickstart guide)
+        local bundled = entry.file:match("/help/") or entry.file:match("quickstart")
+        if not entry.dim and not bundled and lfs.attributes(entry.file, "mode") == "file" then
             local key = entry.text:lower():gsub("%.%w+$", ""):gsub("[^%w]", "")
             local props = DocSettings:hasSidecarFile(entry.file)
                 and DocSettings:open(entry.file):readSetting("doc_props")
