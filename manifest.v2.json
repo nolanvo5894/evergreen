@@ -1,0 +1,27 @@
+{
+ "manifest_version": 2,
+ "id": "evergreen",
+ "name": "Evergreen",
+ "description": "Evergreen for Kindle (https://github.com/nolanvo5894/evergreen)",
+ "packages": {
+  "evergreen": {
+   "name": "Evergreen",
+   "author": "nolanvo5894",
+   "description": "A reader and home screen for jailbroken Kindles, built on KOReader.",
+   "artifacts": [
+    {
+     "url": "packages/evergreen/artifacts/evergreen_0.1.0_kindlehf.kpkg",
+     "version": [
+      0,
+      1,
+      0
+     ],
+     "dependencies": [],
+     "supported_platforms": [
+      "kindlehf"
+     ]
+    }
+   ]
+  }
+ }
+}
