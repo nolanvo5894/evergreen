@@ -7,6 +7,7 @@ manager's title-bar home icon opens it too, and "Home screen" is available as
 a gesture action.
 --]]
 
+local Device = require("device")
 local Dispatcher = require("dispatcher")
 local Event = require("ui/event")
 local NetworkMgr = require("ui/network/manager")
@@ -33,7 +34,12 @@ end
 
 function Evergreen:init()
     self:onDispatcherRegisterActions()
-    if self.ui.document then return end -- reader: closing the book brings the home back
+    if self.ui.document then
+        -- reader: Evergreen's overlay replaces KOReader's top and bottom menus;
+        -- closing the book brings the home back
+        self:registerReaderZones()
+        return
+    end
 
     self.ui.menu:registerToMainMenu(self)
     self.show_home_on_show = G_reader_settings:nilOrTrue("evergreen_home_on_start")
@@ -92,6 +98,89 @@ end
 function Evergreen:openBook(file)
     -- seamless: no "Opening…" box; our screen stays up until the first page
     require("apps/reader/readerui"):showReader(file, nil, true)
+end
+
+---------------------------------------------------------------------------
+-- Reader
+
+function Evergreen:registerReaderZones()
+    local function overrides()
+        return {
+            "readermenu_tap", "readermenu_ext_tap", "readerconfigmenu_tap", "readerconfigmenu_ext_tap",
+            "tap_forward", "tap_backward",
+        }
+    end
+    local show = function(ges) return self:onReaderTap(ges) end
+    self.ui:registerTouchZones({
+        { -- middle of the page
+            id = "evergreen_overlay_center",
+            ges = "tap",
+            screen_zone = { ratio_x = 0.3, ratio_y = 0.15, ratio_w = 0.4, ratio_h = 0.7 },
+            overrides = overrides(),
+            handler = show,
+        },
+        { -- top strip
+            id = "evergreen_overlay_top",
+            ges = "tap",
+            screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1/8 },
+            overrides = overrides(),
+            handler = show,
+        },
+        { -- bottom strip
+            id = "evergreen_overlay_bottom",
+            ges = "tap",
+            screen_zone = { ratio_x = 0, ratio_y = 7/8, ratio_w = 1, ratio_h = 1/8 },
+            overrides = overrides(),
+            handler = show,
+        },
+        { -- the swipes that used to pull the stock menus down / up
+            id = "evergreen_overlay_swipe",
+            ges = "swipe",
+            screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1 },
+            overrides = { "readermenu_swipe", "readermenu_ext_swipe", "readerconfigmenu_swipe", "readerconfigmenu_ext_swipe" },
+            handler = function(ges)
+                local y = ges.pos.y / Device.screen:getHeight()
+                if (ges.direction == "south" and y < 1/5) or (ges.direction == "north" and y > 4/5) then
+                    self:showOverlay()
+                    return true
+                end
+            end,
+        },
+    })
+end
+
+function Evergreen:onReaderTap(ges)
+    -- links and existing highlights keep their own tap behaviour
+    if self.ui.highlight and self.ui.highlight:onTap(nil, ges) then return true end
+    if self.ui.link and self.ui.link:onTap(nil, ges) then return true end
+    self:showOverlay()
+    return true
+end
+
+function Evergreen:showOverlay()
+    if self.overlay then return end
+    local Overlay = require("egoverlay")
+    self.overlay = Overlay:new{ plugin = self }
+    UIManager:show(self.overlay, "ui")
+end
+
+function Evergreen:openReaderPanel(what)
+    if what == "search" then
+        self.ui.search:onShowFulltextSearchInput()
+        return
+    end
+    local panel
+    if what == "text" then
+        panel = require("egtext"):new{ plugin = self }
+    elseif what == "contents" or what == "notes" then
+        panel = require("egcontents"):new{ plugin = self, tab = what == "notes" and "highlights" or "contents" }
+    elseif what == "more" then
+        panel = require("egmore"):new{ plugin = self }
+    end
+    if panel then
+        self.panel = panel
+        UIManager:show(panel, "ui")
+    end
 end
 
 function Evergreen:onShowHomeScreen()
