@@ -104,6 +104,18 @@
      "supported_platforms": [
       "kindlehf"
      ]
+    },
+    {
+     "url": "packages/evergreen/artifacts/evergreen_0.2.4_kindlehf.kpkg",
+     "version": [
+      0,
+      2,
+      4
+     ],
+     "dependencies": [],
+     "supported_platforms": [
+      "kindlehf"
+     ]
     }
    ]
   }
