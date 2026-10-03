@@ -46,6 +46,11 @@ function Evergreen:init()
 
     self.ui.menu:registerToMainMenu(self)
     self.show_home_on_show = G_reader_settings:nilOrTrue("evergreen_home_on_start")
+    -- re-apply the user's Keep awake choice once per run (it doesn't survive a reboot)
+    if not Evergreen.keep_awake_applied and G_reader_settings:has("evergreen_keep_awake") then
+        Evergreen.keep_awake_applied = true
+        self:setKeepAwake(G_reader_settings:isTrue("evergreen_keep_awake"))
+    end
     -- Sleep screen: Evergreen's wallpapers, no "Sleeping" message (set once,
     -- so a user's own later choice sticks)
     if G_reader_settings:hasNot("evergreen_sleep_screen_set") then
@@ -359,6 +364,30 @@ function Evergreen:toggleSSH(home)
     ssh.key_only_auth = true
     if ssh:isRunning() then ssh:stop() else ssh:start() end
     UIManager:scheduleIn(1, function() if self.home == home then self:showHome() end end)
+end
+
+--- Keep awake (Kindle power manager's preventScreenSaver): the device won't
+-- sleep on its own while it's on. Read live, so the tile is always accurate.
+function Evergreen:isKeepAwake()
+    if not Device:isKindle() then return false end
+    local f = io.popen("lipc-get-prop -i com.lab126.powerd preventScreenSaver 2>/dev/null")
+    local v = f and f:read("*n")
+    if f then f:close() end
+    return v == 1
+end
+
+function Evergreen:setKeepAwake(on)
+    if not Device:isKindle() then return end
+    os.execute("lipc-set-prop -i com.lab126.powerd preventScreenSaver " .. (on and 1 or 0))
+    G_reader_settings:saveSetting("evergreen_keep_awake", on and true or false)
+    -- keep KOReader's own Keep alive switch in step
+    local ok, PluginShare = pcall(require, "pluginshare")
+    if ok then PluginShare.keepalive = on and true or false end
+end
+
+function Evergreen:toggleKeepAwake(home)
+    self:setKeepAwake(not self:isKeepAwake())
+    if self.home == home then self:showHome() end
 end
 
 function Evergreen:exitToKindle()

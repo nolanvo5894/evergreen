@@ -344,7 +344,8 @@ function HomeWidget:tileDefs()
         { _("SSH"), (ui.SSH and ui.SSH:isRunning()) and _("Running :2222") or _("Stopped"),
           function() p:toggleSSH(self) end },
         { _("Settings"), _("All settings"), function() ui.menu:onShowMenu() end },
-        { _("Sleep"), _("Suspend"), function() UIManager:suspend() end },
+        { _("Keep awake"), p:isKeepAwake() and _("On · tap to turn off") or _("Off · tap to turn on"),
+          function() p:toggleKeepAwake(self) end, p:isKeepAwake() },
         { _("Files"), _("File browser"), function() p:openFolder(p:libraryDir()) end },
         { _("Kindle"), _("Exit to Amazon UI"), function() p:exitToKindle() end },
     }
@@ -368,13 +369,13 @@ function HomeWidget:tiles()
         else
             table.insert(row, HorizontalSpan:new{ width = gap })
         end
-        table.insert(row, self:tile(def[1], def[2], def[3], tw, th))
+        table.insert(row, self:tile(def[1], def[2], def[3], tw, th, def[4]))
     end
     if row then table.insert(grid, row) end
     return grid
 end
 
-function HomeWidget:tile(label, sub, callback, w, h)
+function HomeWidget:tile(label, sub, callback, w, h, active)
     local pad = Screen:scaleBySize(8)
     local bw = Size.border.button
     local cw = w - 2 * pad - 2 * bw
@@ -386,6 +387,7 @@ function HomeWidget:tile(label, sub, callback, w, h)
             bordersize = bw,
             radius = Size.radius.button,
             padding = pad,
+            background = active and LIGHT or nil,
             LeftContainer:new{
                 dimen = Geom:new{ w = cw, h = h - 2 * pad - 2 * bw },
                 VerticalGroup:new{
