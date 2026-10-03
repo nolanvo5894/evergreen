@@ -25,7 +25,7 @@ local SPACING = {
 }
 local DARKNESS = { { _("Light"), -0.5 }, { _("Normal"), 0 }, { _("Bold"), 1 } }
 local PREFERRED_FONTS = {
-    "Bookerly", "Literata", "Noto Serif", "Noto Sans", "Amazon Ember", "Caecilia", "Georgia", "Palatino",
+    "Bookerly", "Amazon Ember", "Caecilia", "Baskerville", "Literata", "Noto Serif", "Noto Sans", "Palatino",
 }
 local ALIGN_LEFT, ALIGN_JUSTIFY = "text_align_most_left", "text_align_most_justify"
 
@@ -61,9 +61,33 @@ local function same(a, b)
     return a == b
 end
 
+--- Font faces known to the reading engine (incl. the Kindle's own fonts in
+-- /usr/java/lib/fonts), sorted like KOReader's font menu.
 function TextPanel:fonts()
-    local ok, faces = pcall(function() return require("document/credocument"):getFontFaces() end)
-    return ok and faces or {}
+    if self._faces then return self._faces end
+    local ok, faces = pcall(function()
+        return require("document/credocument"):engineInit().getFontFaces()
+    end)
+    faces = ok and faces or {}
+    if self.ui.font and self.ui.font.sortFaceList then
+        local sorted_ok, sorted = pcall(self.ui.font.sortFaceList, self.ui.font, faces)
+        if sorted_ok and sorted then faces = sorted end
+    end
+    self._faces = faces
+    return faces
+end
+
+--- Installed face for a preferred family name: exact match first, then the
+-- shortest face that starts with it ("Caecilia" -> "Caecilia LT").
+function TextPanel:findFace(name)
+    local best
+    local lname = name:lower()
+    for _, f in ipairs(self:fonts()) do
+        local lf = f:lower()
+        if lf == lname then return f end
+        if lf:sub(1, #lname) == lname and (not best or #f < #best) then best = f end
+    end
+    return best
 end
 
 function TextPanel:build()
@@ -84,11 +108,10 @@ function TextPanel:build()
         -- font
         label(_("Font"))
         local current = self.ui.font and self.ui.font.font_face
-        local available = {}
-        for _, f in ipairs(self:fonts()) do available[f] = true end
         local chips, shown = {}, {}
-        for _, f in ipairs(PREFERRED_FONTS) do
-            if available[f] and #chips < 3 then
+        for _, name in ipairs(PREFERRED_FONTS) do
+            local f = self:findFace(name)
+            if f and not shown[f] and #chips < 3 then
                 table.insert(chips, EgUI.chip(f, f == current, function() self:setFont(f) end))
                 shown[f] = true
             end
