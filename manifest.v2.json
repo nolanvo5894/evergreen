@@ -7,7 +7,7 @@
   "evergreen": {
    "name": "Evergreen",
    "author": "nolanvo5894",
-   "description": "A reader and home screen for jailbroken Kindles, built on KOReader.",
+   "description": "A reader and home screen for jailbroken Kindles.",
    "artifacts": [
     {
      "url": "packages/evergreen/artifacts/evergreen_0.1.0_kindlehf.kpkg",
