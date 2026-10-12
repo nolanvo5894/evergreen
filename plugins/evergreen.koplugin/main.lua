@@ -298,11 +298,38 @@ function Evergreen:openReaderPanel(what)
         panel = require("egcontents"):new{ plugin = self, tab = tab }
     elseif what == "more" then
         panel = require("egmore"):new{ plugin = self }
+    elseif what == "sync" then
+        panel = self:otherDevicesPanel()
     end
     if panel then
         self.panel = panel
         UIManager:show(panel, "ui")
     end
+end
+
+-- The bottom bar's Sync: where the other devices are in this book (Bookie), one tap to go there.
+function Evergreen:otherDevicesPanel()
+    local InfoMessage = require("ui/widget/infomessage")
+    local bookie = self.ui.bookiesync
+    if not (bookie and bookie:isConfigured() and bookie:isSupported()) then
+        UIManager:show(InfoMessage:new{ text = _("Set up Bookie sync first: More → Tools → Bookie sync."), timeout = 4 })
+        return
+    end
+    local wait = InfoMessage:new{ text = _("Checking your other devices…") }
+    UIManager:show(wait)
+    UIManager:forceRePaint()
+    local items = bookie:othersMenu() -- syncs first (a few seconds at most)
+    UIManager:close(wait)
+    for _, item in ipairs(items) do
+        local go = item.callback
+        if go then
+            item.callback = function(section)
+                section:close()
+                go()
+            end
+        end
+    end
+    return require("egsection"):new{ title = _("Other devices"), items = items }
 end
 
 function Evergreen:onShowHomeScreen()

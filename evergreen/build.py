@@ -139,6 +139,9 @@ def build():
     # Evergreen's logo in place of the base release's (same file names: the code loads them).
     for ext in ("svg", "png"):
         shutil.copy2(os.path.join(HERE, "brand", f"logo.{ext}"), os.path.join(app_dir, "resources", f"koreader.{ext}"))
+    # Evergreen's own icons (Lucide, ISC), next to the stock ones.
+    for fn in os.listdir(os.path.join(HERE, "brand", "icons")):
+        shutil.copy2(os.path.join(HERE, "brand", "icons", fn), os.path.join(app_dir, "resources", "icons", "mdlight", fn))
     # sleep-screen wallpapers (generated with Qwen-Image 2.1, see art/)
     walls = os.path.join(app_dir, "wallpapers")
     os.makedirs(walls, exist_ok=True)

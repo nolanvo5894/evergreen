@@ -141,6 +141,7 @@ function Overlay:build()
         { "appbar.search", _("Search"), function() self:open("search") end },
         { "appbar.textsize", _("Text"), function() self:open("text") end },
         { "edit", _("Notes"), function() self:open("notes") end },
+        { "evergreen.sync", _("Sync"), function() self:open("sync") end },
         { "appbar.menu", _("More"), function() self:open("more") end },
     }
     local slot_w = math.floor(inner / #actions)
