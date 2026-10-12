@@ -484,6 +484,24 @@ function GetText_mt.__index.pgettext(msgctxt, msgid)
     return GetText.context[msgctxt] and GetText.context[msgctxt][msgid] or GetText.wrapUntranslated(msgid)
 end
 
+-- Evergreen: the interface never names KOReader (its code still runs underneath).
+-- Every message goes through here, in every language, so one substitution covers
+-- menus, dialogs and plugin names. Wiki pointers go to Evergreen's own help.
+local function evergreenBrand(text)
+    if type(text) ~= "string" or not text:find("KOReader", 1, true) then return text end
+    text = text:gsub("the KOReader [Ww]iki", "the online help")
+    text = text:gsub("KOReader [Ww]iki", "online help")
+    return (text:gsub("KOReader", "Evergreen"))
+end
+do
+    local call = GetText_mt.__call
+    GetText_mt.__call = function(gettext, msgid) return evergreenBrand(call(gettext, msgid)) end
+    for _, name in ipairs({ "ngettext", "npgettext", "pgettext" }) do
+        local fn = GetText_mt.__index[name]
+        GetText_mt.__index[name] = function(...) return evergreenBrand(fn(...)) end
+    end
+end
+
 setmetatable(GetText, GetText_mt)
 
 if os.getenv("LANGUAGE") then

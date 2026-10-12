@@ -254,11 +254,7 @@ else
     local last_file = G_reader_settings:readSetting("lastfile")
     local start_with = G_reader_settings:readSetting("start_with") or "filemanager"
 
-    local QuickStart = require("ui/quickstart")
-    if not QuickStart:isShown() then
-        start_with = "last"
-        last_file = QuickStart:getQuickStart()
-    end
+    -- Evergreen: no first-run quickstart guide (it documents the base release, not Evergreen).
 
     if start_with == "last" and last_file and lfs.attributes(last_file, "mode") ~= "file" then
         local function retryLastFile()

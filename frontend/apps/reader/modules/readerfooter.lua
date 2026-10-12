@@ -640,7 +640,7 @@ function ReaderFooter:init()
 
     self.visibility_change = nil
 
-    self.custom_text = G_reader_settings:readSetting("reader_footer_custom_text", "KOReader")
+    self.custom_text = G_reader_settings:readSetting("reader_footer_custom_text", "Evergreen")
     self.custom_text_repetitions =
         tonumber(G_reader_settings:readSetting("reader_footer_custom_text_repetitions", "1"))
 

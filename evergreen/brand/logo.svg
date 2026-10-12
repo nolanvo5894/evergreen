@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Evergreen logo: a fir tree. Replaces KOReader's logo in the package (About box, sleep-screen fallback). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <circle cx="300" cy="300" r="282" fill="none" stroke="#1a1a1a" stroke-width="24"/>
+  <polygon points="300,92 386,214 344,214 432,334 384,334 470,450 130,450 216,334 168,334 256,214 214,214" fill="#1a1a1a"/>
+  <rect x="276" y="450" width="48" height="66" fill="#1a1a1a"/>
+</svg>

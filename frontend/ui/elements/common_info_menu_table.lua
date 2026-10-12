@@ -117,8 +117,17 @@ common_info.plugins_disable_external = {
         UIManager:askForRestart()
     end,
 }
+-- Evergreen's own version, written into the package by evergreen/build.py.
+local function evergreenVersion()
+    local f = io.open("evergreen-version", "r")
+    if not f then return Version:getShortVersion() end
+    local line = f:read("*l") or ""
+    f:close()
+    return line:gsub("^Evergreen%s*", "")
+end
+
 common_info.version = {
-    text = T(_("Version: %1"), Version:getShortVersion()),
+    text = T(_("Version: %1"), evergreenVersion()),
     keep_menu_open = true,
     callback = function()
         UIManager:show(InfoMessage:new{
@@ -131,10 +140,14 @@ common_info.about = {
     keep_menu_open = true,
     callback = function()
         UIManager:show(InfoMessage:new{
-            text = T(_("KOReader %1\n\nA document viewer for E Ink devices.\n\nLicensed under Affero GPL v3. All dependencies are free software.\n\nhttp://koreader.rocks"), BD.ltr(Version:getCurrentRevision())),
+            text = T(_("Evergreen %1\n\nA reader and home screen for E Ink devices.\n\nLicensed under Affero GPL v3. All dependencies are free software.\n\nSource: https://github.com/nolanvo5894/evergreen"), BD.ltr(evergreenVersion())),
             icon = "koreader",
         })
     end
 }
+
+-- Evergreen: no base-release quickstart guide or bug tracker in Help.
+common_info.quickstart_guide = nil
+common_info.report_bug = nil
 
 return common_info

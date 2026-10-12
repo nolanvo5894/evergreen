@@ -36,7 +36,7 @@ PACKAGE = {
     "id": "evergreen",
     "name": "Evergreen",
     "author": "nolanvo5894",
-    "description": "A reader and home screen for jailbroken Kindles, built on KOReader.",
+    "description": "A reader and home screen for jailbroken Kindles.",
 }
 REPO = {
     "id": "evergreen",
@@ -47,6 +47,9 @@ REPO = {
 # Lua that is taken from this checkout instead of the release.
 OVERLAY_DIRS = ["frontend", "plugins"]
 OVERLAY_FILES = ["reader.lua", "datastorage.lua", "defaults.lua", "setupkoenv.lua"]
+# Plugins of the base release that Evergreen does not ship: Bookie sync replaces
+# Progress sync, and the others are developer tools or demos.
+DROPPED_PLUGINS = ["kosync.koplugin", "httpinspector.koplugin", "hello.koplugin"]
 
 
 def read(name):
@@ -131,6 +134,11 @@ def build():
 
     stage_app(fetch_base(base), app_dir)
     patch_sftp_path(app_dir)
+    for name in DROPPED_PLUGINS:
+        shutil.rmtree(os.path.join(app_dir, "plugins", name), ignore_errors=True)
+    # Evergreen's logo in place of the base release's (same file names: the code loads them).
+    for ext in ("svg", "png"):
+        shutil.copy2(os.path.join(HERE, "brand", f"logo.{ext}"), os.path.join(app_dir, "resources", f"koreader.{ext}"))
     # sleep-screen wallpapers (generated with Qwen-Image 2.1, see art/)
     walls = os.path.join(app_dir, "wallpapers")
     os.makedirs(walls, exist_ok=True)
@@ -138,7 +146,7 @@ def build():
         if fn.endswith(".png"):
             shutil.copy2(os.path.join(HERE, "art", fn), os.path.join(walls, fn))
     with open(os.path.join(app_dir, "evergreen-version"), "w") as f:
-        f.write(f"Evergreen {version} (KOReader {base})\n")
+        f.write(f"Evergreen {version}\nbase {base}\n")
 
     kpm_src = os.path.join(HERE, "kpm")
     for item in os.listdir(kpm_src):

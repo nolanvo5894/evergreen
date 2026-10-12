@@ -245,11 +245,9 @@ local order = {
         "exit_menu",
     },
     help = {
-        "quickstart_guide",
         "----------------------------",
         "search_menu",
         "----------------------------",
-        "report_bug",
         "plugins_disable_external",
         "----------------------------",
         "system_statistics",  -- if enabled (Plugin)
