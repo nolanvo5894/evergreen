@@ -186,6 +186,7 @@ def build():
         "name": PACKAGE["name"], "author": PACKAGE["author"],
         "description": PACKAGE["description"], "artifacts": [],
     })
+    pkg.update(name=PACKAGE["name"], author=PACKAGE["author"], description=PACKAGE["description"])
     pkg["artifacts"] = [a for a in pkg["artifacts"] if a["version"] != vparts]
     pkg["artifacts"].append({
         "url": art_rel,
