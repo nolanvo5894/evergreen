@@ -6,15 +6,28 @@ Books are matched by KOReader's partial MD5, so the device must hold the same
 EPUB file that is in the Bookie library. The server translates between
 xpointers and epub.js CFIs; this plugin only speaks xpointers.
 
+Each device keeps its own reading position in Bookie: this one is never moved
+from the server (only a book never read here opens at the latest place).
+"Other devices" in the menu lists where the Mac, the iPhone… are, to jump to.
+
+The library: "Download new books now" (or, when "Download new books
+automatically" is on, the file manager every so often) downloads new EPUBs into
+the Bookie folder (/mnt/us/documents/Bookie on a Kindle), so
+they show up here. Books already on the device (any folder under the home
+folder, matched by partial MD5) aren't downloaded again.
+
 Per book, the sidecar keeps:
   bookie_known        set of Bookie annotation ids last seen on this device
                       (an id that disappears locally is a local delete)
   bookie_progress_at  epoch ms of the last page turn made here
 
-Settings live in settings/bookiesync.lua: server, token, auto_sync.
+Settings live in settings/bookiesync.lua: server, token, auto_sync, device_id,
+library_dir, library_auto (off by default), library_md5 (cache of local files'
+partial MD5s), library_at.
 --]]
 
 local DataStorage = require("datastorage")
+local Device = require("device")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
@@ -24,6 +37,7 @@ local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local http = require("socket.http")
+local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local ltn12 = require("ltn12")
 local socket = require("socket")
@@ -33,6 +47,7 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 
 local DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
+local LIBRARY_EVERY = 30 -- seconds between automatic library checks (each is one small request)
 
 -- LuaJSON decodes null to a sentinel; keep only real values.
 local function val(x)
@@ -69,7 +84,7 @@ end
 
 local BookieSync = WidgetContainer:extend{
     name = "bookiesync",
-    is_doc_only = true,
+    is_doc_only = false, -- the file manager instance keeps the library in step
 }
 
 function BookieSync:init()
@@ -77,6 +92,18 @@ function BookieSync:init()
     self.armed = false   -- count page turns only after the opening sync
     self.busy = false
     self.ui.menu:registerToMainMenu(self)
+    if not self.ui.document then self:scheduleLibrary(8, false) end
+end
+
+function BookieSync:deviceId()
+    local id = self.settings:readSetting("device_id")
+    if not id then
+        math.randomseed(os.time())
+        id = string.format("%08x", math.random(0, 0x7fffffff))
+        self.settings:saveSetting("device_id", id)
+        self.settings:flush()
+    end
+    return id
 end
 
 function BookieSync:isConfigured()
@@ -161,16 +188,25 @@ function BookieSync:collect()
         md5 = self.ui.doc_settings:readSetting("partial_md5_checksum")
               or util.partialMD5(self.ui.document.file),
         filename = self.ui.document.file:match("([^/]+)$"),
-        device = "KOReader",
+        device = Device.model or "KOReader",
+        device_id = self:deviceId(),
+        device_name = Device:isKindle() and "Kindle" or (Device:isKobo() and "Kobo" or "KOReader"),
         progress = {
             xpointer = self.ui.rolling:getLastProgress(),
             percentage = self.ui.rolling:getLastPercent(),
             at = self.ui.doc_settings:readSetting("bookie_progress_at") or 0,
+            chapter = self:chapterTitle(),
         },
         annotations = items,
         deleted = deleted,
         known = known,
     }
+end
+
+function BookieSync:chapterTitle()
+    local ok, title = pcall(function() return self.ui.toc:getTocTitleOfCurrentPage() end)
+    if ok and type(title) == "string" and title ~= "" then return title end
+    return nil
 end
 
 ---------------------------------------------------------------------------
@@ -291,7 +327,10 @@ function BookieSync:apply(res)
     end
     self.ui.doc_settings:saveSetting("bookie_known", known)
 
-    -- reading position from Bookie, when newer than ours
+    -- where the other devices are, for the "Other devices" menu
+    self.others = val(res.others) or {}
+
+    -- a book never read here opens at the latest place (sent only then)
     local p = val(res.progress)
     local jumped
     if p and str(p.xpointer) and p.xpointer ~= self.ui.rolling:getLastProgress()
@@ -364,6 +403,214 @@ function BookieSync:scheduleSync(delay, reason)
 end
 
 ---------------------------------------------------------------------------
+-- Other devices (where the Mac, the iPhone… are in this book)
+
+local function ago(ms)
+    ms = tonumber(ms)
+    if not ms or ms <= 0 then return nil end
+    local s = os.time() - math.floor(ms / 1000)
+    if s < 60 then return _("just now") end
+    if s < 3600 then return T(_("%1 min ago"), math.floor(s / 60)) end
+    if s < 86400 then return T(_("%1 h ago"), math.floor(s / 3600)) end
+    return os.date("%d %b", math.floor(ms / 1000))
+end
+
+function BookieSync:othersMenu()
+    self:sync("devices") -- refresh first (a few seconds at most)
+    local items = {}
+    for _, o in ipairs(self.others or {}) do
+        local xp = str(o.xpointer)
+        if xp then
+            local parts = { str(o.device) or "?",
+                            math.floor((tonumber(val(o.percentage)) or 0) * 100 + 0.5) .. "%" }
+            if str(o.chapter) then table.insert(parts, o.chapter) end
+            table.insert(parts, ago(val(o.at)))
+            table.insert(items, {
+                text = table.concat(parts, " · "),
+                callback = function()
+                    -- a page change like any other: this device's place follows
+                    if self.ui.document:isXPointerInDocument(xp) then
+                        self.ui:handleEvent(Event:new("GotoXPointer", xp))
+                    end
+                end,
+            })
+        end
+    end
+    if #items == 0 then
+        items = {{ text = _("No other device has read this book yet."), enabled = false }}
+    end
+    return items
+end
+
+---------------------------------------------------------------------------
+-- Library: new EPUBs in Bookie are downloaded into the Bookie folder
+
+function BookieSync:libraryDir()
+    local dir = self.settings:readSetting("library_dir")
+    if dir then return dir end
+    if Device:isKindle() then return "/mnt/us/documents/Bookie" end
+    return (G_reader_settings:readSetting("home_dir") or DataStorage:getDataDir()) .. "/Bookie"
+end
+
+function BookieSync:homeDir()
+    if Device:isKindle() then return "/mnt/us/documents" end
+    return G_reader_settings:readSetting("home_dir") or self:libraryDir()
+end
+
+function BookieSync:get(path, timeout)
+    local server = self.settings:readSetting("server"):gsub("/+$", "")
+    local sink = {}
+    socketutil:set_timeout(timeout or 5, (timeout or 5) * 3)
+    local code, headers, status = socket.skip(1, http.request{
+        url = server .. path,
+        method = "GET",
+        headers = { ["Authorization"] = "Bearer " .. self.settings:readSetting("token") },
+        sink = socketutil.table_sink(sink),
+    })
+    socketutil:reset_timeout()
+    if headers == nil then return nil, "network error: " .. tostring(status or code) end
+    if code ~= 200 then return nil, "server returned " .. tostring(code) end
+    local ok, res = pcall(JSON.decode, table.concat(sink))
+    if not ok or type(res) ~= "table" then return nil, "bad response" end
+    return res
+end
+
+--- Partial MD5s of the EPUBs already anywhere under the home folder (cached
+--- per file by size and mtime, so only new files are read).
+function BookieSync:localMd5s()
+    local cache = self.settings:readSetting("library_md5") or {}
+    local fresh, have = {}, {}
+    local function scan(dir, depth)
+        if depth > 4 then return end
+        local ok, iter, obj = pcall(lfs.dir, dir)
+        if not ok or not iter then return end
+        for name in iter, obj do
+            if name ~= "." and name ~= ".." and not name:match("^%.") then
+                local path = dir .. "/" .. name
+                local attr = lfs.attributes(path)
+                if attr and attr.mode == "directory" then
+                    if not name:match("%.sdr$") then scan(path, depth + 1) end
+                elseif attr and name:lower():match("%.epub$") then
+                    local stamp = tostring(attr.size) .. ":" .. tostring(attr.modification)
+                    local hit = cache[path]
+                    local md5 = (hit and hit.stamp == stamp) and hit.md5 or util.partialMD5(path)
+                    if md5 then
+                        fresh[path] = { stamp = stamp, md5 = md5 }
+                        have[md5] = true
+                    end
+                end
+            end
+        end
+    end
+    scan(self:homeDir(), 0)
+    self.settings:saveSetting("library_md5", fresh)
+    return have
+end
+
+local function safeName(s)
+    s = tostring(s or ""):gsub("[%c/\\:%*%?\"<>|]", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if #s > 80 then
+        s = s:sub(1, 80)
+        -- don't end inside a UTF-8 character
+        while #s > 0 and s:byte(#s) >= 0x80 and s:byte(#s) < 0xC0 do s = s:sub(1, -2) end
+        if #s > 0 and s:byte(#s) >= 0xC0 then s = s:sub(1, -2) end
+        s = s:gsub("%s+$", "")
+    end
+    return s
+end
+
+function BookieSync:download(book, dir)
+    local title = safeName(book.title)
+    if title == "" then title = "Untitled" end
+    local author = safeName(book.author)
+    local name = author ~= "" and (title .. " - " .. author) or title
+    local path = dir .. "/" .. name .. ".epub"
+    if lfs.attributes(path, "mode") then path = dir .. "/" .. name .. " (" .. book.id:sub(1, 8) .. ").epub" end
+    local tmp = path .. ".part"
+    local fh, err = io.open(tmp, "wb")
+    if not fh then return nil, err end
+    local server = self.settings:readSetting("server"):gsub("/+$", "")
+    socketutil:set_timeout(20, 600)
+    local code, headers, status = socket.skip(1, http.request{
+        url = server .. "/api/books/" .. book.id .. "/file",
+        method = "GET",
+        headers = { ["Authorization"] = "Bearer " .. self.settings:readSetting("token") },
+        sink = socketutil.file_sink(fh),
+    })
+    socketutil:reset_timeout()
+    pcall(fh.close, fh)
+    local size = lfs.attributes(tmp, "size") or 0
+    local want = tonumber(val(book.size)) or 0
+    if headers == nil or code ~= 200 or size == 0 or (want > 0 and size ~= want) then
+        os.remove(tmp)
+        return nil, "download failed: " .. tostring(status or code)
+    end
+    os.rename(tmp, path)
+    return path
+end
+
+function BookieSync:syncLibrary(interactive)
+    if not self:isConfigured() or self.library_busy then return end
+    self.library_busy = true
+    local queued = false
+    local ok, err = pcall(function()
+        local res, net_err = self:get("/api/koreader/library", interactive and 10 or 5)
+        if not res then error(net_err, 0) end
+        local have = self:localMd5s()
+        local missing = {}
+        for _, b in ipairs(val(res.books) or {}) do
+            if str(b.id) and str(b.md5) and not have[b.md5] then table.insert(missing, b) end
+        end
+        self.settings:saveSetting("library_at", os.time())
+        self.settings:delSetting("library_error")
+        self.settings:flush()
+        if #missing == 0 then
+            if interactive then UIManager:show(InfoMessage:new{ text = _("Bookie: no new books.") }) end
+            return
+        end
+        UIManager:show(Notification:new{ text = T(_("Bookie: downloading %1 new books…"), #missing) })
+        util.makePath(self:libraryDir())
+        queued = true
+        UIManager:scheduleIn(1, function() self:downloadNext(missing, 1, 0) end)
+    end)
+    if not queued then self.library_busy = false end
+    if not ok then
+        logger.warn("BookieSync library:", err)
+        self.settings:saveSetting("library_error", os.date(DATETIME_FMT) .. " " .. tostring(err))
+        self.settings:flush()
+        if interactive then
+            UIManager:show(InfoMessage:new{ text = T(_("Bookie library check failed:\n%1"), tostring(err)) })
+        end
+    end
+end
+
+-- One book at a time, giving the UI a moment between downloads.
+function BookieSync:downloadNext(list, i, done)
+    if i > #list then
+        self.library_busy = false
+        UIManager:show(Notification:new{ text = T(_("Bookie: %1 new books in the Bookie folder"), done) })
+        if self.ui.file_chooser then self.ui.file_chooser:refreshPath() end
+        UIManager:broadcastEvent(Event:new("BookieLibraryChanged"))
+        return
+    end
+    local path, err = self:download(list[i], self:libraryDir())
+    if path then done = done + 1 else logger.warn("BookieSync download", list[i].id, err) end
+    UIManager:scheduleIn(0.5, function() self:downloadNext(list, i + 1, done) end)
+end
+
+-- Automatic checks: in the file manager only, at most every LIBRARY_EVERY.
+function BookieSync:scheduleLibrary(delay)
+    if self.ui.document or not self:autoSync() or not self.settings:isTrue("library_auto") then return end
+    if os.time() - (self.settings:readSetting("library_at") or 0) < LIBRARY_EVERY then return end
+    if self._library then UIManager:unschedule(self._library) end
+    self._library = function()
+        self._library = nil
+        self:syncLibrary(false)
+    end
+    UIManager:scheduleIn(delay, self._library)
+end
+
+---------------------------------------------------------------------------
 -- Events
 
 function BookieSync:onReaderReady()
@@ -402,10 +649,12 @@ end
 
 function BookieSync:onResume()
     self:scheduleSync(3, "resume")
+    self:scheduleLibrary(6)
 end
 
 function BookieSync:onNetworkConnected()
     self:scheduleSync(2, "network")
+    self:scheduleLibrary(4)
 end
 
 ---------------------------------------------------------------------------
@@ -442,6 +691,24 @@ function BookieSync:addToMainMenu(menu_items)
                 callback = function() self:sync("manual", true) end,
             },
             {
+                text = _("Other devices"),
+                enabled_func = function() return self:isConfigured() and self:isSupported() end,
+                sub_item_table_func = function() return self:othersMenu() end,
+            },
+            {
+                text = _("Download new books now"),
+                enabled_func = function() return self:isConfigured() end,
+                callback = function() self:syncLibrary(true) end,
+            },
+            {
+                text = _("Download new books automatically"),
+                checked_func = function() return self.settings:isTrue("library_auto") end,
+                callback = function()
+                    self.settings:flipNilOrFalse("library_auto")
+                    self.settings:flush()
+                end,
+            },
+            {
                 text = _("Sync automatically"),
                 checked_func = function() return self.settings:nilOrTrue("auto_sync") end,
                 callback = function()
@@ -467,7 +734,7 @@ function BookieSync:addToMainMenu(menu_items)
             },
             {
                 text_func = function()
-                    local err = self.settings:readSetting("last_error")
+                    local err = self.settings:readSetting("last_error") or self.settings:readSetting("library_error")
                     if err then return T(_("Last error: %1"), err) end
                     return T(_("Last sync: %1"), self.settings:readSetting("last_sync") or _("never"))
                 end,
